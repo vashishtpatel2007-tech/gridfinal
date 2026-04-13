@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>GridSync Admin</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gray-100 p-10 font-sans">
+    <div class="max-w-4xl mx-auto bg-white shadow-xl rounded-lg overflow-hidden">
+        <div class="bg-blue-900 text-white p-6">
+            <h1 class="text-3xl font-bold">GridSync VPP Control Room</h1>
+            <p class="opacity-80">Virtual Power Plant Aggregator Dashboard</p>
+        </div>
+
+        <div class="p-8">
+            <div id="status-card" class="bg-green-100 border-l-4 border-green-500 text-green-700 p-4 mb-6" role="alert">
+                <p class="font-bold text-lg" id="status-title">Grid Stable</p>
+                <p id="status-msg">No active deficits reported.</p>
+            </div>
+
+            <div id="action-area" class="hidden text-center py-10">
+                <p class="text-red-600 font-bold text-2xl mb-4 animate-pulse">⚠️ IMMEDIATE ACTION REQUIRED</p>
+                <button onclick="approveDrop()" class="bg-red-600 hover:bg-red-700 text-white font-bold py-4 px-8 rounded-full shadow-lg text-xl transition transform hover:scale-105">
+                    APPROVE 500MW DROP
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const ws = new WebSocket("ws://" + window.location.host + "/ws");
+
+        ws.onmessage = function(event) {
+            const data = JSON.parse(event.data);
+            
+            if (data.type === "GRID_ALERT") {
+                // Show Alert
+                document.getElementById("status-card").className = "bg-red-100 border-l-4 border-red-500 text-red-700 p-4 mb-6";
+                document.getElementById("status-title").innerText = "CRITICAL ALERT";
+                document.getElementById("status-msg").innerText = data.msg;
+                document.getElementById("action-area").classList.remove("hidden");
+            } 
+            else if (data.type === "ECO_ACTIVATED") {
+                // Show Success
+                document.getElementById("action-area").classList.add("hidden");
+                document.getElementById("status-card").className = "bg-blue-100 border-l-4 border-blue-500 text-blue-700 p-4 mb-6";
+                document.getElementById("status-title").innerText = "DISPATCH SUCCESSFUL";
+                document.getElementById("status-msg").innerText = data.msg;
+            }
+        };
+
+        async function approveDrop() {
+            await fetch('/api/admin/approve', { method: 'POST' });
+        }
+    </script>
+</body>
+</html>

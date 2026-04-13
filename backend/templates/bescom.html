@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>BESCOM GRID COMMAND</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        body { background-color: #050505; color: #00ff41; font-family: 'Courier New', Courier, monospace; }
+        .neon-border { box-shadow: 0 0 10px #00ff41, inset 0 0 20px rgba(0, 255, 65, 0.2); border: 1px solid #00ff41; }
+        .alert-mode { color: #ff003c; border-color: #ff003c; box-shadow: 0 0 20px #ff003c, inset 0 0 20px rgba(255, 0, 60, 0.2); }
+    </style>
+</head>
+<body class="h-screen flex flex-col p-6 overflow-hidden">
+    <div class="flex justify-between items-center mb-6">
+        <div>
+            <h1 class="text-4xl font-bold tracking-widest">BESCOM <span class="text-white text-sm">GRID OPS</span></h1>
+            <p class="text-xs text-gray-400">SESSION ID: 8X-992 // SECURE CONNECTION</p>
+        </div>
+        <div id="status-badge" class="px-6 py-2 border border-green-500 text-green-500 font-bold animate-pulse">
+            SYSTEM NORMAL
+        </div>
+    </div>
+
+    <div class="flex flex-1 gap-6">
+        <div class="w-3/4 neon-border p-4 rounded-lg bg-black/50 relative">
+            <h2 class="absolute top-2 left-4 text-xs bg-black px-2">REAL-TIME LOAD (MW)</h2>
+            <canvas id="gridChart" class="w-full h-full"></canvas>
+        </div>
+
+        <div class="w-1/4 flex flex-col gap-6">
+            <div class="neon-border p-6 flex-1 flex flex-col justify-center items-center rounded-lg bg-black/50">
+                <span class="text-gray-400 text-xs uppercase mb-2">Current Load</span>
+                <div class="text-6xl font-black" id="load-display">0%</div>
+                <div class="w-full bg-gray-900 h-2 mt-4 rounded-full overflow-hidden">
+                    <div id="load-bar" class="bg-green-500 h-full w-0 transition-all duration-300"></div>
+                </div>
+            </div>
+            <button onclick="triggerManual()" class="p-4 border border-gray-600 text-gray-500 hover:text-white hover:border-white transition-all uppercase text-xs tracking-widest">
+                Force Manual Alert
+            </button>
+        </div>
+    </div>
+
+    <div class="mt-6 h-32 neon-border p-2 overflow-y-auto text-xs font-mono text-gray-500" id="logs">
+        <div class="text-green-500">> SYSTEM INITIALIZED...</div>
+    </div>
+
+    <script>
+        const ctx = document.getElementById('gridChart').getContext('2d');
+        const gridChart = new Chart(ctx, {
+            type: 'line',
+            data: {
+                labels: Array(20).fill(''),
+                datasets: [{
+                    label: 'Grid Load',
+                    data: Array(20).fill(50),
+                    borderColor: '#00ff41',
+                    backgroundColor: 'rgba(0, 255, 65, 0.1)',
+                    borderWidth: 2,
+                    tension: 0.4,
+                    fill: true
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: { legend: { display: false } },
+                scales: { y: { min: 0, max: 100, grid: { color: '#111' } }, x: { display: false } },
+                animation: { duration: 0 }
+            }
+        });
+
+        let alertSent = false; 
+
+        // THE SIMULATION LOOP
+        setInterval(() => {
+            let prevLoad = gridChart.data.datasets[0].data[19]; 
+            let change = (Math.random() - 0.4) * 20; 
+            let newLoad = Math.floor(prevLoad + change);
+
+            if (newLoad < 30) newLoad = 35;
+            if (newLoad > 98) newLoad = 98;
+
+            document.getElementById('load-display').innerText = newLoad + "%";
+            document.getElementById('load-bar').style.width = newLoad + "%";
+            
+            gridChart.data.datasets[0].data.shift(); 
+            gridChart.data.datasets[0].data.push(newLoad); 
+            
+            if (newLoad > 85) {
+                // RED ALERT MODE
+                gridChart.data.datasets[0].borderColor = '#ff003c';
+                gridChart.data.datasets[0].backgroundColor = 'rgba(255, 0, 60, 0.2)';
+                document.getElementById('status-badge').innerText = "CRITICAL SURGE";
+                document.getElementById('status-badge').className = "px-6 py-2 border border-red-500 text-red-500 font-bold animate-pulse";
+                if (!alertSent) { sendAlert(newLoad); alertSent = true; }
+            } else {
+                // NORMAL MODE
+                gridChart.data.datasets[0].borderColor = '#00ff41';
+                gridChart.data.datasets[0].backgroundColor = 'rgba(0, 255, 65, 0.1)';
+                document.getElementById('status-badge').innerText = "SYSTEM NORMAL";
+                document.getElementById('status-badge').className = "px-6 py-2 border border-green-500 text-green-500 font-bold animate-pulse";
+                alertSent = false;
+            }
+            gridChart.update();
+        }, 1000); 
+
+        async function sendAlert(loadValue) {
+            document.getElementById('logs').innerHTML += `<div class="text-red-500">> THRESHOLD BREACHED: ${loadValue}MW. NOTIFYING ADMIN...</div>`;
+            await fetch('/api/bescom/auto-alert', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ load: loadValue })
+            });
+        }
+        function triggerManual() { sendAlert(95); }
+    </script>
+</body>
+</html>
